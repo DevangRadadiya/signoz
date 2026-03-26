@@ -68,7 +68,7 @@ function HostsList(): JSX.Element {
 			...baseQuery,
 			limit: pageSize,
 			offset: (currentPage - 1) * pageSize,
-			filters,
+			filters: filters?.items?.length ? filters : undefined,
 			start: Math.floor(minTime / 1000000),
 			end: Math.floor(maxTime / 1000000),
 			orderBy,
@@ -76,15 +76,6 @@ function HostsList(): JSX.Element {
 	}, [pageSize, currentPage, filters, minTime, maxTime, orderBy]);
 
 	const queryKey = useMemo(() => {
-		if (selectedHostName) {
-			return [
-				'hostList',
-				String(pageSize),
-				String(currentPage),
-				JSON.stringify(filters),
-				JSON.stringify(orderBy),
-			];
-		}
 		return [
 			'hostList',
 			String(pageSize),
@@ -94,15 +85,7 @@ function HostsList(): JSX.Element {
 			String(minTime),
 			String(maxTime),
 		];
-	}, [
-		pageSize,
-		currentPage,
-		filters,
-		orderBy,
-		selectedHostName,
-		minTime,
-		maxTime,
-	]);
+	}, [pageSize, currentPage, filters, orderBy, minTime, maxTime]);
 
 	const { data, isFetching, isLoading, isError } = useGetHostList(
 		query as HostListPayload,
