@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from '@testing-library/react';
 import * as useGetHostListHooks from 'hooks/infraMonitoring/useGetHostList';
-import { withNuqsTestingAdapter } from 'nuqs/adapters/testing';
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import * as appContextHooks from 'providers/App/App';
 import * as timezoneHooks from 'providers/Timezone';
 import store from 'store';
@@ -125,12 +125,10 @@ jest.spyOn(appContextHooks, 'useAppContext').mockReturnValue({
 	},
 } as any);
 
-const Wrapper = withNuqsTestingAdapter({ searchParams: {} });
-
 describe('HostsList', () => {
 	it('renders hosts list table', () => {
 		const { container } = render(
-			<Wrapper>
+			<NuqsTestingAdapter>
 				<QueryClientProvider client={queryClient}>
 					<MemoryRouter>
 						<Provider store={store}>
@@ -138,14 +136,14 @@ describe('HostsList', () => {
 						</Provider>
 					</MemoryRouter>
 				</QueryClientProvider>
-			</Wrapper>,
+			</NuqsTestingAdapter>,
 		);
 		expect(container.querySelector('.hosts-list-table')).toBeInTheDocument();
 	});
 
 	it('renders filters', () => {
 		const { container } = render(
-			<Wrapper>
+			<NuqsTestingAdapter>
 				<QueryClientProvider client={queryClient}>
 					<MemoryRouter>
 						<Provider store={store}>
@@ -153,7 +151,7 @@ describe('HostsList', () => {
 						</Provider>
 					</MemoryRouter>
 				</QueryClientProvider>
-			</Wrapper>,
+			</NuqsTestingAdapter>,
 		);
 		expect(container.querySelector('.filters')).toBeInTheDocument();
 	});
