@@ -6,7 +6,6 @@ import { FeatureKeys } from 'constants/features';
 import { LOCALSTORAGE } from 'constants/localStorage';
 import { ORG_PREFERENCES } from 'constants/orgPreferences';
 import ROUTES from 'constants/routes';
-import history from 'lib/history';
 import { AppContext } from 'providers/App/App';
 import { IAppContext, IUser } from 'providers/App/types';
 import {
@@ -21,19 +20,6 @@ import { OrgPreference } from 'types/api/preferences/preference';
 import { ROLES, USER_ROLES } from 'types/roles';
 
 import PrivateRoute from '../Private';
-
-// Mock history module
-jest.mock('lib/history', () => ({
-	__esModule: true,
-	default: {
-		push: jest.fn(),
-		location: { pathname: '/', search: '', hash: '' },
-		listen: jest.fn(),
-		createHref: jest.fn(),
-	},
-}));
-
-const mockHistoryPush = history.push as jest.Mock;
 
 // Mock localStorage APIs
 const mockLocalStorage: Record<string, string> = {};
@@ -236,20 +222,18 @@ function renderPrivateRoute(options: RenderPrivateRouteOptions = {}): void {
 }
 
 // Generic assertion helpers for navigation behavior
-// Using these allows easier refactoring when switching from history.push to Redirect component
+// Using location-based assertions since Private.tsx now uses Redirect component
 
 async function assertRedirectsTo(targetRoute: string): Promise<void> {
 	await waitFor(() => {
-		expect(mockHistoryPush).toHaveBeenCalledWith(targetRoute);
+		expect(screen.getByTestId('location-display')).toHaveTextContent(targetRoute);
 	});
 }
 
-function assertNoRedirect(): void {
-	expect(mockHistoryPush).not.toHaveBeenCalled();
-}
-
-function assertDoesNotRedirectTo(targetRoute: string): void {
-	expect(mockHistoryPush).not.toHaveBeenCalledWith(targetRoute);
+function assertStaysOnRoute(expectedRoute: string): void {
+	expect(screen.getByTestId('location-display')).toHaveTextContent(
+		expectedRoute,
+	);
 }
 
 function assertRendersChildren(): void {
@@ -347,7 +331,7 @@ describe('PrivateRoute', () => {
 			});
 
 			assertRendersChildren();
-			assertNoRedirect();
+			assertStaysOnRoute('/public/dashboard/abc123');
 		});
 
 		it('should render children for public dashboard route when logged in without redirecting', () => {
@@ -359,7 +343,7 @@ describe('PrivateRoute', () => {
 			assertRendersChildren();
 			// Critical: without the isPublicDashboard early return, logged-in users
 			// would be redirected to HOME due to the non-private route handling
-			assertNoRedirect();
+			assertStaysOnRoute('/public/dashboard/abc123');
 		});
 	});
 
@@ -417,7 +401,7 @@ describe('PrivateRoute', () => {
 			});
 
 			assertRendersChildren();
-			assertNoRedirect();
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 
 		it('should redirect to unauthorized when VIEWER tries to access admin-only route /alerts/new', async () => {
@@ -526,7 +510,7 @@ describe('PrivateRoute', () => {
 				appContext: { isLoggedIn: true },
 			});
 
-			assertDoesNotRedirectTo(ROUTES.HOME);
+			assertStaysOnRoute(ROUTES.SOMETHING_WENT_WRONG);
 		});
 	});
 
@@ -538,7 +522,7 @@ describe('PrivateRoute', () => {
 			});
 
 			// Should not redirect - login page handles its own routing
-			assertNoRedirect();
+			assertStaysOnRoute(ROUTES.LOGIN);
 		});
 
 		it('should not redirect when not logged in user visits signup page', () => {
@@ -547,7 +531,7 @@ describe('PrivateRoute', () => {
 				appContext: { isLoggedIn: false },
 			});
 
-			assertNoRedirect();
+			assertStaysOnRoute(ROUTES.SIGN_UP);
 		});
 
 		it('should not redirect when not logged in user visits password reset page', () => {
@@ -556,7 +540,7 @@ describe('PrivateRoute', () => {
 				appContext: { isLoggedIn: false },
 			});
 
-			assertNoRedirect();
+			assertStaysOnRoute(ROUTES.PASSWORD_RESET);
 		});
 
 		it('should not redirect when not logged in user visits forgot password page', () => {
@@ -565,7 +549,7 @@ describe('PrivateRoute', () => {
 				appContext: { isLoggedIn: false },
 			});
 
-			assertNoRedirect();
+			assertStaysOnRoute(ROUTES.FORGOT_PASSWORD);
 		});
 	});
 
@@ -654,7 +638,7 @@ describe('PrivateRoute', () => {
 			});
 
 			// Admin should be able to access settings even when workspace is blocked
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.SETTINGS);
 		});
 
 		it('should allow ADMIN to access /settings/billing when workspace is blocked', () => {
@@ -670,7 +654,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.BILLING);
 		});
 
 		it('should allow ADMIN to access /settings/org-settings when workspace is blocked', () => {
@@ -686,7 +670,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.ORG_SETTINGS);
 		});
 
 		it('should allow ADMIN to access /settings/members when workspace is blocked', () => {
@@ -702,7 +686,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.MEMBERS_SETTINGS);
 		});
 
 		it('should allow ADMIN to access /settings/my-settings when workspace is blocked', () => {
@@ -718,7 +702,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.MY_SETTINGS);
 		});
 
 		it('should redirect VIEWER to workspace locked even when trying to access settings', async () => {
@@ -829,7 +813,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.WORKSPACE_LOCKED);
 		});
 
 		it('should not redirect self-hosted users to workspace locked even when workSpaceBlock is true', () => {
@@ -846,7 +830,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: false,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 	});
 
@@ -916,7 +900,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
+			assertStaysOnRoute(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
 		});
 
 		it('should not redirect self-hosted users to workspace access restricted when license is terminated', () => {
@@ -933,7 +917,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: false,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 
 		it('should not redirect when license is ACTIVE', () => {
@@ -950,7 +934,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 
 		it('should not redirect when license is EVALUATING', () => {
@@ -967,7 +951,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 	});
 
@@ -1003,7 +987,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_SUSPENDED);
+			assertStaysOnRoute(ROUTES.WORKSPACE_SUSPENDED);
 		});
 
 		it('should not redirect self-hosted users to workspace suspended when license is defaulted', () => {
@@ -1020,7 +1004,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: false,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_SUSPENDED);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 	});
 
@@ -1040,6 +1024,11 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
+			// Wait for the users query to complete and trigger re-render
+			await act(async () => {
+				await Promise.resolve();
+			});
+
 			await assertRedirectsTo(ROUTES.ONBOARDING);
 		});
 
@@ -1055,7 +1044,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 
 		it('should not redirect to onboarding when onboarding is already complete', async () => {
@@ -1081,7 +1070,7 @@ describe('PrivateRoute', () => {
 
 			// Critical: if isOnboardingComplete check is broken (always false),
 			// this test would fail because all other conditions for redirect ARE met
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 
 		it('should not redirect to onboarding for non-cloud users', () => {
@@ -1096,7 +1085,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: false,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 
 		it('should not redirect to onboarding when on /workspace-locked route', () => {
@@ -1111,7 +1100,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			assertStaysOnRoute(ROUTES.WORKSPACE_LOCKED);
 		});
 
 		it('should not redirect to onboarding when on /workspace-suspended route', () => {
@@ -1126,7 +1115,7 @@ describe('PrivateRoute', () => {
 				isCloudUser: true,
 			});
 
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			assertStaysOnRoute(ROUTES.WORKSPACE_SUSPENDED);
 		});
 
 		it('should not redirect to onboarding when workspace is blocked and accessing billing', async () => {
@@ -1153,7 +1142,7 @@ describe('PrivateRoute', () => {
 			});
 
 			// Should NOT redirect to onboarding - user needs to access billing to fix payment
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			assertStaysOnRoute(ROUTES.BILLING);
 		});
 
 		it('should not redirect to onboarding when workspace is blocked and accessing settings', async () => {
@@ -1177,7 +1166,7 @@ describe('PrivateRoute', () => {
 				await Promise.resolve();
 			});
 
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			assertStaysOnRoute(ROUTES.SETTINGS);
 		});
 
 		it('should not redirect to onboarding when workspace is suspended (DEFAULTED)', async () => {
@@ -1204,7 +1193,7 @@ describe('PrivateRoute', () => {
 			});
 
 			// Should redirect to WORKSPACE_SUSPENDED, not ONBOARDING
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			await assertRedirectsTo(ROUTES.WORKSPACE_SUSPENDED);
 		});
 
 		it('should not redirect to onboarding when workspace is access restricted (TERMINATED)', async () => {
@@ -1231,7 +1220,7 @@ describe('PrivateRoute', () => {
 			});
 
 			// Should redirect to WORKSPACE_ACCESS_RESTRICTED, not ONBOARDING
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			await assertRedirectsTo(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
 		});
 
 		it('should not redirect to onboarding when workspace is access restricted (EXPIRED)', async () => {
@@ -1257,7 +1246,7 @@ describe('PrivateRoute', () => {
 				await Promise.resolve();
 			});
 
-			assertDoesNotRedirectTo(ROUTES.ONBOARDING);
+			await assertRedirectsTo(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
 		});
 	});
 
@@ -1299,7 +1288,7 @@ describe('PrivateRoute', () => {
 				},
 			});
 
-			assertDoesNotRedirectTo(ROUTES.GET_STARTED_WITH_CLOUD);
+			assertStaysOnRoute(ROUTES.GET_STARTED);
 		});
 
 		it('should not redirect when on GET_STARTED and ONBOARDING_V3 feature flag is not present', () => {
@@ -1311,7 +1300,7 @@ describe('PrivateRoute', () => {
 				},
 			});
 
-			assertDoesNotRedirectTo(ROUTES.GET_STARTED_WITH_CLOUD);
+			assertStaysOnRoute(ROUTES.GET_STARTED);
 		});
 
 		it('should not redirect when on different route even if ONBOARDING_V3 is active', () => {
@@ -1331,7 +1320,7 @@ describe('PrivateRoute', () => {
 				},
 			});
 
-			assertDoesNotRedirectTo(ROUTES.GET_STARTED_WITH_CLOUD);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 	});
 
@@ -1347,7 +1336,7 @@ describe('PrivateRoute', () => {
 				},
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 
 		it('should not fetch users when org data is not available', () => {
@@ -1390,9 +1379,7 @@ describe('PrivateRoute', () => {
 				},
 			});
 
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_LOCKED);
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_SUSPENDED);
-			assertDoesNotRedirectTo(ROUTES.WORKSPACE_ACCESS_RESTRICTED);
+			assertStaysOnRoute(ROUTES.HOME);
 		});
 	});
 
@@ -1433,22 +1420,40 @@ describe('PrivateRoute', () => {
 			await assertRedirectsTo(ROUTES.UN_AUTHORIZED);
 		});
 
-		it('should allow all roles to access /services route', () => {
-			const roles = [USER_ROLES.ADMIN, USER_ROLES.EDITOR, USER_ROLES.VIEWER];
-
-			roles.forEach((role) => {
-				jest.clearAllMocks();
-
-				renderPrivateRoute({
-					initialRoute: ROUTES.APPLICATION,
-					appContext: {
-						isLoggedIn: true,
-						user: createMockUser({ role: role as ROLES }),
-					},
-				});
-
-				assertDoesNotRedirectTo(ROUTES.UN_AUTHORIZED);
+		it('should allow ADMIN to access /services route', () => {
+			renderPrivateRoute({
+				initialRoute: ROUTES.APPLICATION,
+				appContext: {
+					isLoggedIn: true,
+					user: createMockUser({ role: USER_ROLES.ADMIN as ROLES }),
+				},
 			});
+
+			assertStaysOnRoute(ROUTES.APPLICATION);
+		});
+
+		it('should allow EDITOR to access /services route', () => {
+			renderPrivateRoute({
+				initialRoute: ROUTES.APPLICATION,
+				appContext: {
+					isLoggedIn: true,
+					user: createMockUser({ role: USER_ROLES.EDITOR as ROLES }),
+				},
+			});
+
+			assertStaysOnRoute(ROUTES.APPLICATION);
+		});
+
+		it('should allow VIEWER to access /services route', () => {
+			renderPrivateRoute({
+				initialRoute: ROUTES.APPLICATION,
+				appContext: {
+					isLoggedIn: true,
+					user: createMockUser({ role: USER_ROLES.VIEWER as ROLES }),
+				},
+			});
+
+			assertStaysOnRoute(ROUTES.APPLICATION);
 		});
 
 		it('should redirect VIEWER from /onboarding route (admin only)', async () => {
@@ -1478,7 +1483,7 @@ describe('PrivateRoute', () => {
 			});
 
 			assertRendersChildren();
-			assertDoesNotRedirectTo(ROUTES.UN_AUTHORIZED);
+			assertStaysOnRoute(ROUTES.CHANNELS_NEW);
 		});
 
 		it('should allow EDITOR to access /get-started route', () => {
@@ -1490,7 +1495,7 @@ describe('PrivateRoute', () => {
 				},
 			});
 
-			assertDoesNotRedirectTo(ROUTES.UN_AUTHORIZED);
+			assertStaysOnRoute(ROUTES.GET_STARTED);
 		});
 	});
 
